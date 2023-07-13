@@ -1,0 +1,9 @@
+rootProject.name = 'SkillTracker-Backend'
+
+include(':auth-service')
+include(':engineer-service')
+include(':admin-service')
+include(':common-library')
+include(':api-gateway')
+include(':skill-tracker-server')
+

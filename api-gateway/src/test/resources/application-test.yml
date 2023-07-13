@@ -1,0 +1,33 @@
+####Api Gateway Configuration####
+spring:
+  cloud:
+    gateway:
+      ##### Routes configuration#####
+      routes:
+        - id: lookup
+          uri: https://localhost:8081
+          predicates:
+            - Path=/lookup/**
+          filters:
+            - AuthenticationFilter
+
+##Loging levels
+logging:
+  level:
+    root: ERROR
+    #core: DEBUG
+    org.springframework.cloud: DEBUG
+    com.iiht.fse4: DEBUG
+
+#### Actuator configuration ###
+management:
+  endpoint:
+    health:
+      show-details: "always"
+  info:
+    git:
+      mode: "full"
+  endpoints:
+    web:
+      exposure:
+        include: "health,info,gateway"

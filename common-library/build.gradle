@@ -1,0 +1,33 @@
+plugins {
+    id 'org.springframework.boot' version '2.6.13' apply false
+    id 'io.spring.dependency-management' version '1.0.15.RELEASE'
+    id 'java'
+    id 'java-library'
+}
+
+group 'com.iiht.fse4.skilltracker.common'
+version '1.0.0-SNAPSHOT'
+sourceCompatibility = '11'
+
+jar.enabled(true)
+
+repositories {
+    mavenCentral()
+}
+
+dependencies {
+    implementation 'org.springframework.boot:spring-boot-starter-web'
+    compileOnly 'org.projectlombok:lombok:1.18.24'
+    annotationProcessor 'org.projectlombok:lombok:1.18.24'
+
+    api 'javax.validation:validation-api:2.0.0.Final'
+
+    implementation 'io.jsonwebtoken:jjwt:0.9.1'
+    implementation 'org.springframework.boot:spring-boot-starter-aop:2.6.13'
+}
+
+dependencyManagement {
+    imports {
+        mavenBom org.springframework.boot.gradle.plugin.SpringBootPlugin.BOM_COORDINATES
+    }
+}

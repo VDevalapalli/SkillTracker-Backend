@@ -1,0 +1,8 @@
+spring:
+  application:
+    name: admin-service
+  mvc:
+    pathmatch:
+      matching-strategy: ant-path-matcher
+
+feign.engineerService.url: /skilltracker/api/v1/engineer

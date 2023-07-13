@@ -1,0 +1,9 @@
+server.port: 8761
+server.servlet.context-path: /skill-tracker
+
+eureka:
+  client:
+    eureka-server-connect-timeout-seconds: 10
+    enabled: true
+    fetch-registry: false
+    register-with-eureka: false

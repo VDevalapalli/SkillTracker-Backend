@@ -1,0 +1,6 @@
+spring:
+  application:
+    name: engineer-service
+  mvc:
+    pathmatch:
+      matching-strategy: ANT_PATH_MATCHER

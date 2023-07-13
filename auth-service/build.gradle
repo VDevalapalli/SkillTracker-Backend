@@ -1,0 +1,107 @@
+plugins {
+	id 'org.springframework.boot' version '2.7.4'
+	id 'io.spring.dependency-management' version '1.0.15.RELEASE'
+	id 'java'
+	id 'jacoco'
+	id 'org.sonarqube' version '3.1.1'
+}
+
+group = 'com.iiht.fse4'
+version = '1.0.0'
+description = 'Skill Tracker Authorization Service'
+sourceCompatibility = '11'
+
+configurations {
+	compileOnly {
+		extendsFrom annotationProcessor
+	}
+}
+
+repositories {
+	mavenCentral()
+}
+
+ext {
+	baseVersion = "1.0.0"
+	springCloudVersion = "2021.0.4"
+}
+
+dependencies {
+	implementation 'org.springframework.boot:spring-boot-starter-actuator'
+	implementation 'org.springframework.boot:spring-boot-starter-data-jpa'
+	implementation 'org.springframework.boot:spring-boot-starter-security'
+	implementation 'org.springframework.boot:spring-boot-starter-web'
+
+    developmentOnly 'org.springframework.boot:spring-boot-devtools'
+
+	testImplementation 'org.springframework.boot:spring-boot-starter-test'
+	testImplementation 'org.springframework.security:spring-security-test'
+
+	compileOnly 'org.projectlombok:lombok'
+	annotationProcessor 'org.projectlombok:lombok'
+	runtimeOnly 'org.postgresql:postgresql'
+	testRuntimeOnly 'com.h2database:h2:2.1.214'
+
+	implementation 'com.google.code.gson:gson'
+	implementation 'com.fasterxml.jackson.core:jackson-databind'
+
+	implementation 'io.jsonwebtoken:jjwt-api:0.11.5'
+	implementation 'io.jsonwebtoken:jjwt-impl:0.11.5'
+	implementation 'io.jsonwebtoken:jjwt-jackson:0.11.5'
+
+	implementation 'org.springframework.cloud:spring-cloud-starter-netflix-eureka-client'
+
+	//Spring Doc
+	implementation 'org.springdoc:springdoc-openapi-ui:1.6.12'
+	implementation 'org.springdoc:springdoc-openapi-data-rest:1.6.12'
+}
+
+dependencyManagement {
+	imports {
+		mavenBom "org.springframework.cloud:spring-cloud-dependencies:${springCloudVersion}"
+	}
+}
+
+test {
+	useJUnitPlatform()
+	finalizedBy jacocoTestReport // report is always generated after tests run
+}
+
+jacocoTestReport {
+	dependsOn test // tests are required to run before generating the report
+}
+
+jacoco {
+	toolVersion = "0.8.7"
+}
+jacocoTestReport {
+	reports {
+		xml.enabled true
+		html.enabled true
+		csv.enabled false
+	}
+}
+jacocoTestCoverageVerification {
+	violationRules {
+		rule {
+			element = 'BUNDLE'
+			limit {
+				value = 'COVEREDRATIO'
+				minimum = 0.0
+			}
+		}
+	}
+}
+
+project.tasks["sonarqube"].dependsOn "jacocoTestReport"
+
+sonarqube {
+	properties {
+		property 'sonar.projectKey', 'com.iiht.fse4:skill-tracker-auth-service'
+		property 'sonar.projectName', 'skill-tracker-auth-service'
+		property "sonar.coverage.exclusions", "**/model/**,**/config/**,**/test/**,**/*generated*/**"
+		property "sonar.coverage.jacoco.xmlReportPaths", "${project.buildDir}/reports/jacoco/test/jacocoTestReport.xml"
+	}
+}
+
+build.finalizedBy(["jacocoTestReport", "jacocoTestCoverageVerification"])
