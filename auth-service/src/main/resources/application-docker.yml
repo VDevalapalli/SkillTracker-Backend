@@ -1,0 +1,55 @@
+server:
+  port: 8080
+#  servlet:
+#    context-path: /skill-tracker
+
+spring:
+  datasource:
+    url: jdbc:postgresql://localhost:5432/skill_tracker_db
+    driver-class-name: org.postgresql.Driver
+    username: postgres
+    password: postgres
+  jpa:
+    show-sql: true
+    hibernate:
+      dl-auto: update
+      naming:
+        physical-strategy: org.hibernate.boot.model.naming.PhysicalNamingStrategyStandardImpl
+
+### Logging ###
+logging:
+  level:
+    root: INFO
+    #core: DEBUG
+    org.apache.tomcat: ERROR
+    org.apache.catalina: ERROR
+    org.springframework.web: ERROR
+    com.iiht.fse4.auth: INFO
+
+### Actuator ###
+management:
+  endpoint:
+    health:
+      show-details: "always"
+  info:
+    git:
+      mode: "full"
+  endpoints:
+    web:
+      ## Custom base path for Actuator
+      base-path: /actuator
+      exposure:
+        include: "health,info"
+
+### EUREKA ###
+eureka:
+  client:
+    service-url:
+      defaultZone: http://eurekaservice:8761/skill-tracker/eureka/
+
+    register-with-eureka: true
+    fetch-registry: true
+  instance:
+    lease-renewal-interval-in-seconds: 30
+    instance-id: ${spring.application.name}:${random.uuid}
+    hostname: eurekaservice

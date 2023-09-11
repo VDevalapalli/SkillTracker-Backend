@@ -33,8 +33,8 @@ CREATE TABLE skilltracker.user_info (
                                         user_name VARCHAR(30) NOT NULL,
                                         password VARCHAR(500) NOT NULL,
                                         user_first_name VARCHAR(100) NOT NULL,
-                                        user_last_name VARCHAR(100) NOT NULL
-                                        user_email VARCHAR(150) NOT null,
+                                        user_last_name VARCHAR(100) NOT NULL,
+                                        user_email VARCHAR(150) NOT NULL,
                                         user_role VARCHAR(25) NOT NULL DEFAULT 'FSE',
                                         token VARCHAR(500) NULL,
                                         created_date TIMESTAMP NOT NULL default CURRENT_TIMESTAMP,

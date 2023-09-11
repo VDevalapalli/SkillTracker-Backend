@@ -1,0 +1,12 @@
+version: '2'
+
+services:
+  skill-tracker-server:
+    image: skilltracker/skill-tracker-server:latest
+    build:
+      context: .
+    container_name: eurekaservice
+    environment:
+      - "SPRING_PROFILES_ACTIVE=docker"
+    ports:
+      - "8761:8761"

@@ -1,0 +1,77 @@
+server.port: 8081
+#server.servlet.context-path: /skill-tracker
+
+spring:
+  application:
+    name: engineer-service
+  datasource:
+    url: jdbc:postgresql://localhost:5432/skill_tracker_db
+    driver-class-name: org.postgresql.Driver
+    username: postgres
+    password: postgres
+
+    #url: jdbc:mysql://localhost:3306/skill_tracker_db
+    #username: root
+    #password: root
+  jpa:
+    show-sql: true
+    hibernate:
+      dl-auto: update
+      naming:
+        physical-strategy: org.hibernate.boot.model.naming.PhysicalNamingStrategyStandardImpl
+    properties:
+      hibernate:
+        dialect: org.hibernate.dialect.PostgreSQLDialect
+  kafka:
+    topic:
+      name: profile_topic
+    producer:
+      key-serializer: org.apache.kafka.common.serialization.StringSerializer
+      value-serializer: org.springframework.kafka.support.serializer.JsonSerializer
+      #key-serializer: org.apache.common.kafka.support.serialization.StringSerializer
+      #value-serializer: org.springframework.kafka.support.serializer.JsonSerializer
+      #key-serializer: org.apache.kafka.common.serialization.StringSerializer
+      #value-serializer: org.apache.kafka.common.serialization.StringSerializer
+      properties:
+        spring.json.type.mapping:
+          event: com.iiht.fse4.skilltracker.common.model.ProfileEvent
+    bootstrap-servers: kafka:9092
+    groupId: profile_group
+
+### Logging ###
+logging:
+  level:
+    root: INFO
+    #core: DEBUG
+    org.apache.tomcat: ERROR
+    org.apache.catalina: ERROR
+    org.springframework.web: ERROR
+    com.iiht.fse4.auth: INFO
+
+### Actuator ###
+management:
+  endpoint:
+    health:
+      show-details: "always"
+  info:
+    git:
+      mode: "full"
+  endpoints:
+    web:
+      ## Custom base path for Actuator
+      base-path: /actuator
+      exposure:
+        include: "health,info"
+
+### EUREKA ###
+eureka:
+  client:
+    service-url:
+      defaultZone: http://eurekaservice:8761/skill-tracker/eureka/
+
+    register-with-eureka: true
+    fetch-registry: true
+  instance:
+    lease-renewal-interval-in-seconds: 30
+    instance-id: ${spring.application.name}:${random.uuid}
+    hostname: eurekaservice

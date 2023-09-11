@@ -1,0 +1,151 @@
+version: '3'
+
+networks:
+  spring-cloud-network:
+    driver: bridge
+
+services:
+  postgres:
+    image: 'postgres:14.8-alpine'
+    container_name: postgres
+    ports:
+      - '5432:5432'
+    environment:
+      - POSTGRES_USER=postgres
+      - POSTGRES_PASSWORD=postgres
+      - POSTGRES_DB=skill_tracker_db
+    networks:
+      - spring-cloud-network
+
+  zookeeper:
+    image: confluentinc/cp-zookeeper:latest
+    hostname: zookeeper
+    container_name: zookeeper
+    ports:
+      - "2181:2181"
+    environment:
+      ZOOKEEPER_CLIENT_PORT: 2181
+      ZOOKEEPER_SERVER_ID: 1
+    networks:
+      - spring-cloud-network
+
+  kafka:
+    image: confluentinc/cp-kafka:latest
+    depends_on:
+      - zookeeper
+    hostname: kafka
+    container_name: kafka
+    ports:
+      - "9092:9092"
+    environment:
+      #KAFKA_BROKER_ID: 1
+      KAFKA_ZOOKEEPER_CONNECT: "zookeeper:2181"
+      #KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:29092,PLAINTEXT_HOST://localhost:9092
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:9092
+      KAFKA_LISTENERS: PLAINTEXT://0.0.0.0:9092
+      #KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT,PLAINTEXT_HOST:PLAINTEXT
+      #KAFKA_INTER_BROKER_LISTENER_NAME: PLAINTEXT
+      #KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+      KAFKA_CREATE_TOPICS: "profile_topic:1:1"
+      KAFKA_AUTO_CREATE_TOPICS_ENABLE: 'false'
+    networks:
+      - spring-cloud-network
+
+  mongo:
+    image: mongo:latest
+    container_name: mongo
+    environment:
+      MONGO_INITDB_ROOT_USERNAME: mongo
+      MONGO_INITDB_ROOT_PASSWORD: mongo
+    ports:
+      - 27017:27017
+    networks:
+      - spring-cloud-network
+
+  skilltracker-eurekaservice:
+    container_name: eurekaservice
+    build:
+      context: skill-tracker-server
+      dockerfile: Dockerfile
+    image: skill-tracker-server:latest
+    environment:
+      - "SPRING_PROFILES_ACTIVE=docker"
+    ports:
+      - "8761:8761"
+    networks:
+      - spring-cloud-network
+
+  auth-service:
+    container_name: authservice
+    build:
+      context: auth-service
+      dockerfile: Dockerfile
+    image: auth-service:latest
+    links:
+      - skilltracker-eurekaservice
+    depends_on:
+      - postgres
+      - skilltracker-eurekaservice
+    environment:
+      - "SPRING_PROFILES_ACTIVE=docker"
+      - SPRING_DATASOURCE_URL=jdbc:postgresql://postgres:5432/skill_tracker_db
+      - SPRING_DATASOURCE_USERNAME=postgres
+      - SPRING_DATASOURCE_PASSWORD=postgres
+      - SPRING_JPA_HIBERNATE_DDL=update
+      - "EUREKA_CLIENT_SERVICE-URL_DEFAULTZONE: http://eurekaservice:8761/eureka"
+    ports:
+      - "8080:8080"
+    networks:
+      - spring-cloud-network
+
+  engineer-service:
+    container_name: engineerservice
+    build:
+      context: engineer-service
+      dockerfile: Dockerfile
+    image: engineer-service:latest
+    links:
+      - skilltracker-eurekaservice
+    depends_on:
+      - postgres
+      - skilltracker-eurekaservice
+      - kafka
+    environment:
+      - "SPRING_PROFILES_ACTIVE=docker"
+      - SPRING_DATASOURCE_URL=jdbc:postgresql://postgres:5432/skill_tracker_db
+      - SPRING_DATASOURCE_USERNAME=postgres
+      - SPRING_DATASOURCE_PASSWORD=postgres
+      - SPRING_JPA_HIBERNATE_DDL=update
+      - "EUREKA_CLIENT_SERVICE-URL_DEFAULTZONE: http://eurekaservice:8761/eureka"
+      - "SPRING_KAFKA_BOOTSTRAPSERVERS: kafka:9092"
+      - "SPRING_KAFKA_PRODUCER_GROUP_ID: profile_group"
+    ports:
+      - "8081:8081"
+    networks:
+      - spring-cloud-network
+
+  admin-service:
+    container_name: adminservice
+    build:
+      context: admin-service
+      dockerfile: Dockerfile
+    image: admin-service:latest
+    links:
+      - mongo
+      - skilltracker-eurekaservice
+    depends_on:
+      - mongo
+      - skilltracker-eurekaservice
+      - kafka
+    environment:
+      - "SPRING_PROFILES_ACTIVE=docker"
+      - SPRING_DATASOURCE_URL=mongodb://mongo:27017/skill_tracker_db
+      - SPRING_DATASOURCE_USERNAME=mongo
+      - SPRING_DATASOURCE_PASSWORD=mongo
+      - "EUREKA_CLIENT_SERVICE-URL_DEFAULTZONE: http://eurekaservice:8761/eureka"
+      - "SPRING_KAFKA_BOOTSTRAPSERVERS: kafka:9092"
+      #- "SPRING_KAFKA_CONSUMER_GROUP_ID: admin-service"
+    ports:
+      - "8082:8082"
+    networks:
+      - spring-cloud-network

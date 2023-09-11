@@ -21,7 +21,7 @@ public class SkillProfileConsumer {
 
     private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
 
-    @KafkaListener(topics = "${spring.kafka.topic.name}",groupId = "${spring.kafka.consumer.group-id}")
+    @KafkaListener(topics = "${spring.kafka.topic.name}",groupId = "${spring.kafka.consumer.groupId}")
     public void consumeProfile(ProfileEvent profileEvent) {
         log.info(String.format("Profile event received =>" + profileEvent.toString()));
         try {
