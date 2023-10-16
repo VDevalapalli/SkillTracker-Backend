@@ -11,7 +11,7 @@ import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestHeader;
 
-@FeignClient(name = "engineer-service", url = "http://localhost:8081/skill-tracker", configuration = FeignClientConfig.class, fallback = EngineerServiceFallBack.class)
+@FeignClient(name = "engineer-service", url = "${spring.cloud.fienClient.url}", configuration = FeignClientConfig.class, fallback = EngineerServiceFallBack.class)
 public interface EngineerServiceClient {
 
 //    @GetMapping(value = "/{criteria}/{criteriaValue}", produces = MediaType.APPLICATION_JSON_VALUE)

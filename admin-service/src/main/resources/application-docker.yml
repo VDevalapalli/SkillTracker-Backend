@@ -20,12 +20,18 @@ spring:
     exclude:
       - org.springframework.boot.autoconfigure.jdbc.DataSourceAutoConfiguration
 
+  cloud:
+    fienClient:
+      url: http://engineer-service:8081/skill-tracker
+
   data:
     mongodb:
-      uri: mongodb://mongo:27017/skill_tracker_db
-      username: mongo
-      password: mongo
+      database: skill_tracker_db
       host: mongo
+      port: 27017
+      uri: mongodb://mongo:27017
+      #username: mongo
+      #password: mongo
 
   kafka:
     topic:

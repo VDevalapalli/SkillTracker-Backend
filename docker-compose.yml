@@ -7,13 +7,17 @@ networks:
 services:
   postgres:
     image: 'postgres:14.8-alpine'
-    container_name: postgres
+    container_name: postgres_sql
+    restart: always
     ports:
       - '5432:5432'
     environment:
       - POSTGRES_USER=postgres
       - POSTGRES_PASSWORD=postgres
       - POSTGRES_DB=skill_tracker_db
+    volumes:
+      # copy the sql script to create tables
+      - ./sql/skill-tracker-postgres.sql:/docker-entrypoint-initdb.d/skill-tracker-postgres.sql
     networks:
       - spring-cloud-network
 
@@ -45,7 +49,7 @@ services:
       KAFKA_LISTENERS: PLAINTEXT://0.0.0.0:9092
       #KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT,PLAINTEXT_HOST:PLAINTEXT
       #KAFKA_INTER_BROKER_LISTENER_NAME: PLAINTEXT
-      #KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
       KAFKA_CREATE_TOPICS: "profile_topic:1:1"
       KAFKA_AUTO_CREATE_TOPICS_ENABLE: 'false'
     networks:
@@ -54,15 +58,19 @@ services:
   mongo:
     image: mongo:latest
     container_name: mongo
+    restart: always
     environment:
-      MONGO_INITDB_ROOT_USERNAME: mongo
-      MONGO_INITDB_ROOT_PASSWORD: mongo
+      MONGO_INITDB_DATABASE: skill_tracker_db
+      #MONGO_INITDB_ROOT_USERNAME: mongo
+      #MONGO_INITDB_ROOT_PASSWORD: mongo
     ports:
       - 27017:27017
+    volumes:
+      - ./sql/mongo-init.js:/docker-entrypoint-initdb.d/mongo-init.js
     networks:
       - spring-cloud-network
 
-  skilltracker-eurekaservice:
+  eurekaservice:
     container_name: eurekaservice
     build:
       context: skill-tracker-server
@@ -82,10 +90,10 @@ services:
       dockerfile: Dockerfile
     image: auth-service:latest
     links:
-      - skilltracker-eurekaservice
+      - eurekaservice
     depends_on:
       - postgres
-      - skilltracker-eurekaservice
+      - eurekaservice
     environment:
       - "SPRING_PROFILES_ACTIVE=docker"
       - SPRING_DATASOURCE_URL=jdbc:postgresql://postgres:5432/skill_tracker_db
@@ -105,10 +113,10 @@ services:
       dockerfile: Dockerfile
     image: engineer-service:latest
     links:
-      - skilltracker-eurekaservice
+      - eurekaservice
     depends_on:
       - postgres
-      - skilltracker-eurekaservice
+      - eurekaservice
       - kafka
     environment:
       - "SPRING_PROFILES_ACTIVE=docker"
@@ -132,16 +140,16 @@ services:
     image: admin-service:latest
     links:
       - mongo
-      - skilltracker-eurekaservice
+      - eurekaservice
     depends_on:
       - mongo
-      - skilltracker-eurekaservice
+      - eurekaservice
       - kafka
     environment:
       - "SPRING_PROFILES_ACTIVE=docker"
       - SPRING_DATASOURCE_URL=mongodb://mongo:27017/skill_tracker_db
-      - SPRING_DATASOURCE_USERNAME=mongo
-      - SPRING_DATASOURCE_PASSWORD=mongo
+      #- SPRING_DATASOURCE_USERNAME=mongo
+      #- SPRING_DATASOURCE_PASSWORD=mongo
       - "EUREKA_CLIENT_SERVICE-URL_DEFAULTZONE: http://eurekaservice:8761/eureka"
       - "SPRING_KAFKA_BOOTSTRAPSERVERS: kafka:9092"
       #- "SPRING_KAFKA_CONSUMER_GROUP_ID: admin-service"
@@ -149,3 +157,28 @@ services:
       - "8082:8082"
     networks:
       - spring-cloud-network
+      
+  api-gateway:
+    container_name: apigateway
+    build:
+      context: api-gateway
+      dockerfile: Dockerfile
+    image: api-gateway:latest
+    links:
+      - eurekaservice
+    depends_on:
+      - eurekaservice
+      - auth-service
+      - engineer-service
+      - admin-service
+    environment:
+      - "SPRING_PROFILES_ACTIVE=docker"
+      - "EUREKA_CLIENT_SERVICE-URL_DEFAULTZONE: http://eurekaservice:8761/eureka"
+    ports:
+      - "9080:9080"
+    networks:
+      - spring-cloud-network
+
+volumes:
+  postgres-data:
+    driver: local
