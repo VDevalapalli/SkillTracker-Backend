@@ -1,4 +1,4 @@
-version: '3'
+version: '3.8'
 
 networks:
   spring-cloud-network:
@@ -15,9 +15,9 @@ services:
       - POSTGRES_USER=postgres
       - POSTGRES_PASSWORD=postgres
       - POSTGRES_DB=skill_tracker_db
-    volumes:
+    #volumes:
       # copy the sql script to create tables
-      - ./sql/skill-tracker-postgres.sql:/docker-entrypoint-initdb.d/skill-tracker-postgres.sql
+      #- ./sql/skill-tracker-postgres.sql:/docker-entrypoint-initdb.d/skill-tracker-postgres.sql
     networks:
       - spring-cloud-network
 
@@ -65,35 +65,32 @@ services:
       #MONGO_INITDB_ROOT_PASSWORD: mongo
     ports:
       - 27017:27017
-    volumes:
-      - ./sql/mongo-init.js:/docker-entrypoint-initdb.d/mongo-init.js
+    #volumes:
+      #- ./sql/mongo-init.js:/docker-entrypoint-initdb.d/mongo-init.js
     networks:
       - spring-cloud-network
 
-  eurekaservice:
-    container_name: eurekaservice
-    build:
-      context: skill-tracker-server
-      dockerfile: Dockerfile
-    image: skill-tracker-server:latest
-    environment:
-      - "SPRING_PROFILES_ACTIVE=docker"
-    ports:
-      - "8761:8761"
-    networks:
-      - spring-cloud-network
+#  eurekaservice:
+#    container_name: eurekaservice
+#    build:
+#      context: skill-tracker-server
+#      dockerfile: Dockerfile
+#    image: viswadocker123/skill-tracker-server:latest
+#    environment:
+#      - "SPRING_PROFILES_ACTIVE=docker"
+#    ports:
+#      - "8761:8761"
+#    networks:
+#      - spring-cloud-network
 
   auth-service:
     container_name: authservice
     build:
       context: auth-service
       dockerfile: Dockerfile
-    image: auth-service:latest
-    links:
-      - eurekaservice
+    image: viswadocker123/auth-service:latest
     depends_on:
       - postgres
-      - eurekaservice
     environment:
       - "SPRING_PROFILES_ACTIVE=docker"
       - SPRING_DATASOURCE_URL=jdbc:postgresql://postgres:5432/skill_tracker_db
@@ -111,12 +108,9 @@ services:
     build:
       context: engineer-service
       dockerfile: Dockerfile
-    image: engineer-service:latest
-    links:
-      - eurekaservice
+    image: viswadocker123/engineer-service:latest
     depends_on:
       - postgres
-      - eurekaservice
       - kafka
     environment:
       - "SPRING_PROFILES_ACTIVE=docker"
@@ -137,13 +131,11 @@ services:
     build:
       context: admin-service
       dockerfile: Dockerfile
-    image: admin-service:latest
+    image: viswadocker123/admin-service:latest
     links:
       - mongo
-      - eurekaservice
     depends_on:
       - mongo
-      - eurekaservice
       - kafka
     environment:
       - "SPRING_PROFILES_ACTIVE=docker"
@@ -163,11 +155,8 @@ services:
     build:
       context: api-gateway
       dockerfile: Dockerfile
-    image: api-gateway:latest
-    links:
-      - eurekaservice
+    image: viswadocker123/api-gateway:latest
     depends_on:
-      - eurekaservice
       - auth-service
       - engineer-service
       - admin-service
@@ -178,7 +167,3 @@ services:
       - "9080:9080"
     networks:
       - spring-cloud-network
-
-volumes:
-  postgres-data:
-    driver: local

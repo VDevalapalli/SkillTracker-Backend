@@ -89,13 +89,13 @@ management:
         include: "health,info,gateway"
 
 ### EUREKA ###
-eureka:
-  client:
-    service-url:
-      defaultZone: http://eurekaservice:8761/skill-tracker/eureka/
-
-    register-with-eureka: true
-    fetch-registry: true
-  instance:
-    lease-renewal-interval-in-seconds: 30
-    instance-id: ${spring.application.name}:${random.uuid}
+#eureka:
+#  client:
+#    service-url:
+#      defaultZone: http://eurekaservice:8761/skill-tracker/eureka/
+#
+#    register-with-eureka: true
+#    fetch-registry: true
+#  instance:
+#    lease-renewal-interval-in-seconds: 30
+#    instance-id: ${spring.application.name}:${random.uuid}
