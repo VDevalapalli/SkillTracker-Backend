@@ -1,0 +1,1411 @@
+AWSTemplateFormatVersion: 2010-09-09
+Resources:
+  AdminserviceService:
+    DependsOn:
+      - AdminserviceTCP8082Listener
+      - MongoService
+      - KafkaService
+    Properties:
+      Cluster:
+        Fn::GetAtt:
+          - Cluster
+          - Arn
+      DeploymentConfiguration:
+        MaximumPercent: 200
+        MinimumHealthyPercent: 100
+      DeploymentController:
+        Type: ECS
+      DesiredCount: 1
+      LaunchType: FARGATE
+      LoadBalancers:
+        - ContainerName: admin-service
+          ContainerPort: 8082
+          TargetGroupArn:
+            Ref: AdminserviceTCP8082TargetGroup
+      NetworkConfiguration:
+        AwsvpcConfiguration:
+          AssignPublicIp: ENABLED
+          SecurityGroups:
+            - Ref: SpringcloudnetworkNetwork
+          Subnets:
+            - subnet-08318553376bbbe2d
+            - subnet-0921600234d556f9d
+            - subnet-021f5d12ab260ff7c
+            - subnet-07790604e627001ae
+            - subnet-0e4a5a070d19aa7f2
+            - subnet-072918ef81782d0a6
+      PlatformVersion: 1.4.0
+      PropagateTags: SERVICE
+      SchedulingStrategy: REPLICA
+      ServiceRegistries:
+        - RegistryArn:
+            Fn::GetAtt:
+              - AdminserviceServiceDiscoveryEntry
+              - Arn
+      Tags:
+        - Key: com.docker.compose.project
+          Value: skilltracker-backend
+        - Key: com.docker.compose.service
+          Value: admin-service
+      TaskDefinition:
+        Ref: AdminserviceTaskDefinition
+    Type: AWS::ECS::Service
+  AdminserviceServiceDiscoveryEntry:
+    Properties:
+      Description: '"admin-service" service discovery entry in Cloud Map'
+      DnsConfig:
+        DnsRecords:
+          - TTL: 60
+            Type: A
+        RoutingPolicy: MULTIVALUE
+      HealthCheckCustomConfig:
+        FailureThreshold: 1
+      Name: admin-service
+      NamespaceId:
+        Ref: CloudMap
+    Type: AWS::ServiceDiscovery::Service
+  AdminserviceTCP8082Listener:
+    Properties:
+      DefaultActions:
+        - ForwardConfig:
+            TargetGroups:
+              - TargetGroupArn:
+                  Ref: AdminserviceTCP8082TargetGroup
+          Type: forward
+      LoadBalancerArn:
+        Ref: LoadBalancer
+      Port: 8082
+      Protocol: TCP
+    Type: AWS::ElasticLoadBalancingV2::Listener
+  AdminserviceTCP8082TargetGroup:
+    Properties:
+      Port: 8082
+      Protocol: TCP
+      Tags:
+        - Key: com.docker.compose.project
+          Value: skilltracker-backend
+      TargetType: ip
+      VpcId: vpc-0de56540248f68bef
+    Type: AWS::ElasticLoadBalancingV2::TargetGroup
+  AdminserviceTaskDefinition:
+    Properties:
+      ContainerDefinitions:
+        - Command:
+            - us-east-1.compute.internal
+            - skilltracker-backend.local
+          Essential: false
+          Image: docker/ecs-searchdomain-sidecar:1.0
+          LogConfiguration:
+            LogDriver: awslogs
+            Options:
+              awslogs-group:
+                Ref: LogGroup
+              awslogs-region:
+                Ref: AWS::Region
+              awslogs-stream-prefix: skilltracker-backend
+          Name: Adminservice_ResolvConf_InitContainer
+        - DependsOn:
+            - Condition: SUCCESS
+              ContainerName: Adminservice_ResolvConf_InitContainer
+          Environment:
+            - Name: 'EUREKA_CLIENT_SERVICE-URL_DEFAULTZONE: http://eurekaservice:8761/eureka'
+            - Name: SPRING_DATASOURCE_URL
+              Value: mongodb://mongo:27017/skill_tracker_db
+            - Name: 'SPRING_KAFKA_BOOTSTRAPSERVERS: kafka:9092'
+            - Name: SPRING_PROFILES_ACTIVE
+              Value: docker
+          Essential: true
+          Image: docker.io/viswadocker123/admin-service:latest@sha256:6d486a0cf02075705e86fdee15b458d75089188d729256d6ad7527dca9a2f48e
+          LinuxParameters: {}
+          LogConfiguration:
+            LogDriver: awslogs
+            Options:
+              awslogs-group:
+                Ref: LogGroup
+              awslogs-region:
+                Ref: AWS::Region
+              awslogs-stream-prefix: skilltracker-backend
+          Name: admin-service
+          PortMappings:
+            - ContainerPort: 8082
+              HostPort: 8082
+              Protocol: tcp
+      Cpu: "256"
+      ExecutionRoleArn:
+        Ref: AdminserviceTaskExecutionRole
+      Family: skilltracker-backend-admin-service
+      Memory: "512"
+      NetworkMode: awsvpc
+      RequiresCompatibilities:
+        - FARGATE
+    Type: AWS::ECS::TaskDefinition
+  AdminserviceTaskExecutionRole:
+    Properties:
+      AssumeRolePolicyDocument:
+        Statement:
+          - Action:
+              - sts:AssumeRole
+            Condition: {}
+            Effect: Allow
+            Principal:
+              Service: ecs-tasks.amazonaws.com
+        Version: 2012-10-17
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/service-role/AmazonECSTaskExecutionRolePolicy
+        - arn:aws:iam::aws:policy/AmazonEC2ContainerRegistryReadOnly
+      Tags:
+        - Key: com.docker.compose.project
+          Value: skilltracker-backend
+        - Key: com.docker.compose.service
+          Value: admin-service
+    Type: AWS::IAM::Role
+  ApigatewayService:
+    DependsOn:
+      - ApigatewayTCP9080Listener
+      - EngineerserviceService
+      - AdminserviceService
+      - AuthserviceService
+    Properties:
+      Cluster:
+        Fn::GetAtt:
+          - Cluster
+          - Arn
+      DeploymentConfiguration:
+        MaximumPercent: 200
+        MinimumHealthyPercent: 100
+      DeploymentController:
+        Type: ECS
+      DesiredCount: 1
+      LaunchType: FARGATE
+      LoadBalancers:
+        - ContainerName: api-gateway
+          ContainerPort: 9080
+          TargetGroupArn:
+            Ref: ApigatewayTCP9080TargetGroup
+      NetworkConfiguration:
+        AwsvpcConfiguration:
+          AssignPublicIp: ENABLED
+          SecurityGroups:
+            - Ref: SpringcloudnetworkNetwork
+          Subnets:
+            - subnet-08318553376bbbe2d
+            - subnet-0921600234d556f9d
+            - subnet-021f5d12ab260ff7c
+            - subnet-07790604e627001ae
+            - subnet-0e4a5a070d19aa7f2
+            - subnet-072918ef81782d0a6
+      PlatformVersion: 1.4.0
+      PropagateTags: SERVICE
+      SchedulingStrategy: REPLICA
+      ServiceRegistries:
+        - RegistryArn:
+            Fn::GetAtt:
+              - ApigatewayServiceDiscoveryEntry
+              - Arn
+      Tags:
+        - Key: com.docker.compose.project
+          Value: skilltracker-backend
+        - Key: com.docker.compose.service
+          Value: api-gateway
+      TaskDefinition:
+        Ref: ApigatewayTaskDefinition
+    Type: AWS::ECS::Service
+  ApigatewayServiceDiscoveryEntry:
+    Properties:
+      Description: '"api-gateway" service discovery entry in Cloud Map'
+      DnsConfig:
+        DnsRecords:
+          - TTL: 60
+            Type: A
+        RoutingPolicy: MULTIVALUE
+      HealthCheckCustomConfig:
+        FailureThreshold: 1
+      Name: api-gateway
+      NamespaceId:
+        Ref: CloudMap
+    Type: AWS::ServiceDiscovery::Service
+  ApigatewayTCP9080Listener:
+    Properties:
+      DefaultActions:
+        - ForwardConfig:
+            TargetGroups:
+              - TargetGroupArn:
+                  Ref: ApigatewayTCP9080TargetGroup
+          Type: forward
+      LoadBalancerArn:
+        Ref: LoadBalancer
+      Port: 9080
+      Protocol: TCP
+    Type: AWS::ElasticLoadBalancingV2::Listener
+  ApigatewayTCP9080TargetGroup:
+    Properties:
+      Port: 9080
+      Protocol: TCP
+      Tags:
+        - Key: com.docker.compose.project
+          Value: skilltracker-backend
+      TargetType: ip
+      VpcId: vpc-0de56540248f68bef
+    Type: AWS::ElasticLoadBalancingV2::TargetGroup
+  ApigatewayTaskDefinition:
+    Properties:
+      ContainerDefinitions:
+        - Command:
+            - us-east-1.compute.internal
+            - skilltracker-backend.local
+          Essential: false
+          Image: docker/ecs-searchdomain-sidecar:1.0
+          LogConfiguration:
+            LogDriver: awslogs
+            Options:
+              awslogs-group:
+                Ref: LogGroup
+              awslogs-region:
+                Ref: AWS::Region
+              awslogs-stream-prefix: skilltracker-backend
+          Name: Apigateway_ResolvConf_InitContainer
+        - DependsOn:
+            - Condition: SUCCESS
+              ContainerName: Apigateway_ResolvConf_InitContainer
+          Environment:
+            - Name: 'EUREKA_CLIENT_SERVICE-URL_DEFAULTZONE: http://eurekaservice:8761/eureka'
+            - Name: SPRING_PROFILES_ACTIVE
+              Value: docker
+          Essential: true
+          Image: docker.io/viswadocker123/api-gateway:latest@sha256:3e2b202c9c2f6c994c171b1bfa4e041a4835980bdb34da02904fc43177b66262
+          LinuxParameters: {}
+          LogConfiguration:
+            LogDriver: awslogs
+            Options:
+              awslogs-group:
+                Ref: LogGroup
+              awslogs-region:
+                Ref: AWS::Region
+              awslogs-stream-prefix: skilltracker-backend
+          Name: api-gateway
+          PortMappings:
+            - ContainerPort: 9080
+              HostPort: 9080
+              Protocol: tcp
+      Cpu: "256"
+      ExecutionRoleArn:
+        Ref: ApigatewayTaskExecutionRole
+      Family: skilltracker-backend-api-gateway
+      Memory: "512"
+      NetworkMode: awsvpc
+      RequiresCompatibilities:
+        - FARGATE
+    Type: AWS::ECS::TaskDefinition
+  ApigatewayTaskExecutionRole:
+    Properties:
+      AssumeRolePolicyDocument:
+        Statement:
+          - Action:
+              - sts:AssumeRole
+            Condition: {}
+            Effect: Allow
+            Principal:
+              Service: ecs-tasks.amazonaws.com
+        Version: 2012-10-17
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/service-role/AmazonECSTaskExecutionRolePolicy
+        - arn:aws:iam::aws:policy/AmazonEC2ContainerRegistryReadOnly
+      Tags:
+        - Key: com.docker.compose.project
+          Value: skilltracker-backend
+        - Key: com.docker.compose.service
+          Value: api-gateway
+    Type: AWS::IAM::Role
+  AuthserviceService:
+    DependsOn:
+      - AuthserviceTCP8080Listener
+      - PostgresService
+    Properties:
+      Cluster:
+        Fn::GetAtt:
+          - Cluster
+          - Arn
+      DeploymentConfiguration:
+        MaximumPercent: 200
+        MinimumHealthyPercent: 100
+      DeploymentController:
+        Type: ECS
+      DesiredCount: 1
+      LaunchType: FARGATE
+      LoadBalancers:
+        - ContainerName: auth-service
+          ContainerPort: 8080
+          TargetGroupArn:
+            Ref: AuthserviceTCP8080TargetGroup
+      NetworkConfiguration:
+        AwsvpcConfiguration:
+          AssignPublicIp: ENABLED
+          SecurityGroups:
+            - Ref: SpringcloudnetworkNetwork
+          Subnets:
+            - subnet-08318553376bbbe2d
+            - subnet-0921600234d556f9d
+            - subnet-021f5d12ab260ff7c
+            - subnet-07790604e627001ae
+            - subnet-0e4a5a070d19aa7f2
+            - subnet-072918ef81782d0a6
+      PlatformVersion: 1.4.0
+      PropagateTags: SERVICE
+      SchedulingStrategy: REPLICA
+      ServiceRegistries:
+        - RegistryArn:
+            Fn::GetAtt:
+              - AuthserviceServiceDiscoveryEntry
+              - Arn
+      Tags:
+        - Key: com.docker.compose.project
+          Value: skilltracker-backend
+        - Key: com.docker.compose.service
+          Value: auth-service
+      TaskDefinition:
+        Ref: AuthserviceTaskDefinition
+    Type: AWS::ECS::Service
+  AuthserviceServiceDiscoveryEntry:
+    Properties:
+      Description: '"auth-service" service discovery entry in Cloud Map'
+      DnsConfig:
+        DnsRecords:
+          - TTL: 60
+            Type: A
+        RoutingPolicy: MULTIVALUE
+      HealthCheckCustomConfig:
+        FailureThreshold: 1
+      Name: auth-service
+      NamespaceId:
+        Ref: CloudMap
+    Type: AWS::ServiceDiscovery::Service
+  AuthserviceTCP8080Listener:
+    Properties:
+      DefaultActions:
+        - ForwardConfig:
+            TargetGroups:
+              - TargetGroupArn:
+                  Ref: AuthserviceTCP8080TargetGroup
+          Type: forward
+      LoadBalancerArn:
+        Ref: LoadBalancer
+      Port: 8080
+      Protocol: TCP
+    Type: AWS::ElasticLoadBalancingV2::Listener
+  AuthserviceTCP8080TargetGroup:
+    Properties:
+      Port: 8080
+      Protocol: TCP
+      Tags:
+        - Key: com.docker.compose.project
+          Value: skilltracker-backend
+      TargetType: ip
+      VpcId: vpc-0de56540248f68bef
+    Type: AWS::ElasticLoadBalancingV2::TargetGroup
+  AuthserviceTaskDefinition:
+    Properties:
+      ContainerDefinitions:
+        - Command:
+            - us-east-1.compute.internal
+            - skilltracker-backend.local
+          Essential: false
+          Image: docker/ecs-searchdomain-sidecar:1.0
+          LogConfiguration:
+            LogDriver: awslogs
+            Options:
+              awslogs-group:
+                Ref: LogGroup
+              awslogs-region:
+                Ref: AWS::Region
+              awslogs-stream-prefix: skilltracker-backend
+          Name: Authservice_ResolvConf_InitContainer
+        - DependsOn:
+            - Condition: SUCCESS
+              ContainerName: Authservice_ResolvConf_InitContainer
+          Environment:
+            - Name: 'EUREKA_CLIENT_SERVICE-URL_DEFAULTZONE: http://eurekaservice:8761/eureka'
+            - Name: SPRING_DATASOURCE_PASSWORD
+              Value: postgres
+            - Name: SPRING_DATASOURCE_URL
+              Value: jdbc:postgresql://postgres:5432/skill_tracker_db
+            - Name: SPRING_DATASOURCE_USERNAME
+              Value: postgres
+            - Name: SPRING_JPA_HIBERNATE_DDL
+              Value: update
+            - Name: SPRING_PROFILES_ACTIVE
+              Value: docker
+          Essential: true
+          Image: docker.io/viswadocker123/auth-service:latest@sha256:3201baaede186a882ffaaa55cb0b8ae649897350d9b8c7b28cf89c7f369fe98f
+          LinuxParameters: {}
+          LogConfiguration:
+            LogDriver: awslogs
+            Options:
+              awslogs-group:
+                Ref: LogGroup
+              awslogs-region:
+                Ref: AWS::Region
+              awslogs-stream-prefix: skilltracker-backend
+          Name: auth-service
+          PortMappings:
+            - ContainerPort: 8080
+              HostPort: 8080
+              Protocol: tcp
+      Cpu: "256"
+      ExecutionRoleArn:
+        Ref: AuthserviceTaskExecutionRole
+      Family: skilltracker-backend-auth-service
+      Memory: "512"
+      NetworkMode: awsvpc
+      RequiresCompatibilities:
+        - FARGATE
+    Type: AWS::ECS::TaskDefinition
+  AuthserviceTaskExecutionRole:
+    Properties:
+      AssumeRolePolicyDocument:
+        Statement:
+          - Action:
+              - sts:AssumeRole
+            Condition: {}
+            Effect: Allow
+            Principal:
+              Service: ecs-tasks.amazonaws.com
+        Version: 2012-10-17
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/service-role/AmazonECSTaskExecutionRolePolicy
+        - arn:aws:iam::aws:policy/AmazonEC2ContainerRegistryReadOnly
+      Tags:
+        - Key: com.docker.compose.project
+          Value: skilltracker-backend
+        - Key: com.docker.compose.service
+          Value: auth-service
+    Type: AWS::IAM::Role
+  CloudMap:
+    Properties:
+      Description: Service Map for Docker Compose project skilltracker-backend
+      Name: skilltracker-backend.local
+      Vpc: vpc-0de56540248f68bef
+    Type: AWS::ServiceDiscovery::PrivateDnsNamespace
+  Cluster:
+    Properties:
+      ClusterName: skilltracker-backend
+      Tags:
+        - Key: com.docker.compose.project
+          Value: skilltracker-backend
+    Type: AWS::ECS::Cluster
+  EngineerserviceService:
+    DependsOn:
+      - EngineerserviceTCP8081Listener
+      - PostgresService
+      - KafkaService
+    Properties:
+      Cluster:
+        Fn::GetAtt:
+          - Cluster
+          - Arn
+      DeploymentConfiguration:
+        MaximumPercent: 200
+        MinimumHealthyPercent: 100
+      DeploymentController:
+        Type: ECS
+      DesiredCount: 1
+      LaunchType: FARGATE
+      LoadBalancers:
+        - ContainerName: engineer-service
+          ContainerPort: 8081
+          TargetGroupArn:
+            Ref: EngineerserviceTCP8081TargetGroup
+      NetworkConfiguration:
+        AwsvpcConfiguration:
+          AssignPublicIp: ENABLED
+          SecurityGroups:
+            - Ref: SpringcloudnetworkNetwork
+          Subnets:
+            - subnet-08318553376bbbe2d
+            - subnet-0921600234d556f9d
+            - subnet-021f5d12ab260ff7c
+            - subnet-07790604e627001ae
+            - subnet-0e4a5a070d19aa7f2
+            - subnet-072918ef81782d0a6
+      PlatformVersion: 1.4.0
+      PropagateTags: SERVICE
+      SchedulingStrategy: REPLICA
+      ServiceRegistries:
+        - RegistryArn:
+            Fn::GetAtt:
+              - EngineerserviceServiceDiscoveryEntry
+              - Arn
+      Tags:
+        - Key: com.docker.compose.project
+          Value: skilltracker-backend
+        - Key: com.docker.compose.service
+          Value: engineer-service
+      TaskDefinition:
+        Ref: EngineerserviceTaskDefinition
+    Type: AWS::ECS::Service
+  EngineerserviceServiceDiscoveryEntry:
+    Properties:
+      Description: '"engineer-service" service discovery entry in Cloud Map'
+      DnsConfig:
+        DnsRecords:
+          - TTL: 60
+            Type: A
+        RoutingPolicy: MULTIVALUE
+      HealthCheckCustomConfig:
+        FailureThreshold: 1
+      Name: engineer-service
+      NamespaceId:
+        Ref: CloudMap
+    Type: AWS::ServiceDiscovery::Service
+  EngineerserviceTCP8081Listener:
+    Properties:
+      DefaultActions:
+        - ForwardConfig:
+            TargetGroups:
+              - TargetGroupArn:
+                  Ref: EngineerserviceTCP8081TargetGroup
+          Type: forward
+      LoadBalancerArn:
+        Ref: LoadBalancer
+      Port: 8081
+      Protocol: TCP
+    Type: AWS::ElasticLoadBalancingV2::Listener
+  EngineerserviceTCP8081TargetGroup:
+    Properties:
+      Port: 8081
+      Protocol: TCP
+      Tags:
+        - Key: com.docker.compose.project
+          Value: skilltracker-backend
+      TargetType: ip
+      VpcId: vpc-0de56540248f68bef
+    Type: AWS::ElasticLoadBalancingV2::TargetGroup
+  EngineerserviceTaskDefinition:
+    Properties:
+      ContainerDefinitions:
+        - Command:
+            - us-east-1.compute.internal
+            - skilltracker-backend.local
+          Essential: false
+          Image: docker/ecs-searchdomain-sidecar:1.0
+          LogConfiguration:
+            LogDriver: awslogs
+            Options:
+              awslogs-group:
+                Ref: LogGroup
+              awslogs-region:
+                Ref: AWS::Region
+              awslogs-stream-prefix: skilltracker-backend
+          Name: Engineerservice_ResolvConf_InitContainer
+        - DependsOn:
+            - Condition: SUCCESS
+              ContainerName: Engineerservice_ResolvConf_InitContainer
+          Environment:
+            - Name: 'EUREKA_CLIENT_SERVICE-URL_DEFAULTZONE: http://eurekaservice:8761/eureka'
+            - Name: SPRING_DATASOURCE_PASSWORD
+              Value: postgres
+            - Name: SPRING_DATASOURCE_URL
+              Value: jdbc:postgresql://postgres:5432/skill_tracker_db
+            - Name: SPRING_DATASOURCE_USERNAME
+              Value: postgres
+            - Name: SPRING_JPA_HIBERNATE_DDL
+              Value: update
+            - Name: 'SPRING_KAFKA_BOOTSTRAPSERVERS: kafka:9092'
+            - Name: 'SPRING_KAFKA_PRODUCER_GROUP_ID: profile_group'
+            - Name: SPRING_PROFILES_ACTIVE
+              Value: docker
+          Essential: true
+          Image: docker.io/viswadocker123/engineer-service:latest@sha256:a9e5279980c31a4b9829f861429cf74ca0610787791879c0e9a3f82e0b92c35c
+          LinuxParameters: {}
+          LogConfiguration:
+            LogDriver: awslogs
+            Options:
+              awslogs-group:
+                Ref: LogGroup
+              awslogs-region:
+                Ref: AWS::Region
+              awslogs-stream-prefix: skilltracker-backend
+          Name: engineer-service
+          PortMappings:
+            - ContainerPort: 8081
+              HostPort: 8081
+              Protocol: tcp
+      Cpu: "256"
+      ExecutionRoleArn:
+        Ref: EngineerserviceTaskExecutionRole
+      Family: skilltracker-backend-engineer-service
+      Memory: "512"
+      NetworkMode: awsvpc
+      RequiresCompatibilities:
+        - FARGATE
+    Type: AWS::ECS::TaskDefinition
+  EngineerserviceTaskExecutionRole:
+    Properties:
+      AssumeRolePolicyDocument:
+        Statement:
+          - Action:
+              - sts:AssumeRole
+            Condition: {}
+            Effect: Allow
+            Principal:
+              Service: ecs-tasks.amazonaws.com
+        Version: 2012-10-17
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/service-role/AmazonECSTaskExecutionRolePolicy
+        - arn:aws:iam::aws:policy/AmazonEC2ContainerRegistryReadOnly
+      Tags:
+        - Key: com.docker.compose.project
+          Value: skilltracker-backend
+        - Key: com.docker.compose.service
+          Value: engineer-service
+    Type: AWS::IAM::Role
+  KafkaService:
+    DependsOn:
+      - KafkaTCP9092Listener
+      - ZookeeperService
+    Properties:
+      Cluster:
+        Fn::GetAtt:
+          - Cluster
+          - Arn
+      DeploymentConfiguration:
+        MaximumPercent: 200
+        MinimumHealthyPercent: 100
+      DeploymentController:
+        Type: ECS
+      DesiredCount: 1
+      LaunchType: FARGATE
+      LoadBalancers:
+        - ContainerName: kafka
+          ContainerPort: 9092
+          TargetGroupArn:
+            Ref: KafkaTCP9092TargetGroup
+      NetworkConfiguration:
+        AwsvpcConfiguration:
+          AssignPublicIp: ENABLED
+          SecurityGroups:
+            - Ref: SpringcloudnetworkNetwork
+          Subnets:
+            - subnet-08318553376bbbe2d
+            - subnet-0921600234d556f9d
+            - subnet-021f5d12ab260ff7c
+            - subnet-07790604e627001ae
+            - subnet-0e4a5a070d19aa7f2
+            - subnet-072918ef81782d0a6
+      PlatformVersion: 1.4.0
+      PropagateTags: SERVICE
+      SchedulingStrategy: REPLICA
+      ServiceRegistries:
+        - RegistryArn:
+            Fn::GetAtt:
+              - KafkaServiceDiscoveryEntry
+              - Arn
+      Tags:
+        - Key: com.docker.compose.project
+          Value: skilltracker-backend
+        - Key: com.docker.compose.service
+          Value: kafka
+      TaskDefinition:
+        Ref: KafkaTaskDefinition
+    Type: AWS::ECS::Service
+  KafkaServiceDiscoveryEntry:
+    Properties:
+      Description: '"kafka" service discovery entry in Cloud Map'
+      DnsConfig:
+        DnsRecords:
+          - TTL: 60
+            Type: A
+        RoutingPolicy: MULTIVALUE
+      HealthCheckCustomConfig:
+        FailureThreshold: 1
+      Name: kafka
+      NamespaceId:
+        Ref: CloudMap
+    Type: AWS::ServiceDiscovery::Service
+  KafkaTCP9092Listener:
+    Properties:
+      DefaultActions:
+        - ForwardConfig:
+            TargetGroups:
+              - TargetGroupArn:
+                  Ref: KafkaTCP9092TargetGroup
+          Type: forward
+      LoadBalancerArn:
+        Ref: LoadBalancer
+      Port: 9092
+      Protocol: TCP
+    Type: AWS::ElasticLoadBalancingV2::Listener
+  KafkaTCP9092TargetGroup:
+    Properties:
+      Port: 9092
+      Protocol: TCP
+      Tags:
+        - Key: com.docker.compose.project
+          Value: skilltracker-backend
+      TargetType: ip
+      VpcId: vpc-0de56540248f68bef
+    Type: AWS::ElasticLoadBalancingV2::TargetGroup
+  KafkaTaskDefinition:
+    Properties:
+      ContainerDefinitions:
+        - Command:
+            - us-east-1.compute.internal
+            - skilltracker-backend.local
+          Essential: false
+          Image: docker/ecs-searchdomain-sidecar:1.0
+          LogConfiguration:
+            LogDriver: awslogs
+            Options:
+              awslogs-group:
+                Ref: LogGroup
+              awslogs-region:
+                Ref: AWS::Region
+              awslogs-stream-prefix: skilltracker-backend
+          Name: Kafka_ResolvConf_InitContainer
+        - DependsOn:
+            - Condition: SUCCESS
+              ContainerName: Kafka_ResolvConf_InitContainer
+          Environment:
+            - Name: KAFKA_ADVERTISED_LISTENERS
+              Value: PLAINTEXT://kafka:9092
+            - Name: KAFKA_AUTO_CREATE_TOPICS_ENABLE
+              Value: "false"
+            - Name: KAFKA_CREATE_TOPICS
+              Value: profile_topic:1:1
+            - Name: KAFKA_LISTENERS
+              Value: PLAINTEXT://0.0.0.0:9092
+            - Name: KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR
+              Value: "1"
+            - Name: KAFKA_ZOOKEEPER_CONNECT
+              Value: zookeeper:2181
+          Essential: true
+          Image: docker.io/confluentinc/cp-kafka:latest@sha256:dc9b972db0029bca9c9fa33fb7d271bbd6de35bfe56bed42d78dcb4b0b63f6b2
+          LinuxParameters: {}
+          LogConfiguration:
+            LogDriver: awslogs
+            Options:
+              awslogs-group:
+                Ref: LogGroup
+              awslogs-region:
+                Ref: AWS::Region
+              awslogs-stream-prefix: skilltracker-backend
+          Name: kafka
+          PortMappings:
+            - ContainerPort: 9092
+              HostPort: 9092
+              Protocol: tcp
+      Cpu: "256"
+      ExecutionRoleArn:
+        Ref: KafkaTaskExecutionRole
+      Family: skilltracker-backend-kafka
+      Memory: "512"
+      NetworkMode: awsvpc
+      RequiresCompatibilities:
+        - FARGATE
+    Type: AWS::ECS::TaskDefinition
+  KafkaTaskExecutionRole:
+    Properties:
+      AssumeRolePolicyDocument:
+        Statement:
+          - Action:
+              - sts:AssumeRole
+            Condition: {}
+            Effect: Allow
+            Principal:
+              Service: ecs-tasks.amazonaws.com
+        Version: 2012-10-17
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/service-role/AmazonECSTaskExecutionRolePolicy
+        - arn:aws:iam::aws:policy/AmazonEC2ContainerRegistryReadOnly
+      Tags:
+        - Key: com.docker.compose.project
+          Value: skilltracker-backend
+        - Key: com.docker.compose.service
+          Value: kafka
+    Type: AWS::IAM::Role
+  LoadBalancer:
+    Properties:
+      LoadBalancerAttributes:
+        - Key: load_balancing.cross_zone.enabled
+          Value: "true"
+      Scheme: internet-facing
+      Subnets:
+        - subnet-08318553376bbbe2d
+        - subnet-0921600234d556f9d
+        - subnet-021f5d12ab260ff7c
+        - subnet-07790604e627001ae
+        - subnet-0e4a5a070d19aa7f2
+        - subnet-072918ef81782d0a6
+      Tags:
+        - Key: com.docker.compose.project
+          Value: skilltracker-backend
+      Type: network
+    Type: AWS::ElasticLoadBalancingV2::LoadBalancer
+  LogGroup:
+    Properties:
+      LogGroupName: /docker-compose/skilltracker-backend
+    Type: AWS::Logs::LogGroup
+  MongoService:
+    DependsOn:
+      - MongoTCP27017Listener
+    Properties:
+      Cluster:
+        Fn::GetAtt:
+          - Cluster
+          - Arn
+      DeploymentConfiguration:
+        MaximumPercent: 200
+        MinimumHealthyPercent: 100
+      DeploymentController:
+        Type: ECS
+      DesiredCount: 1
+      LaunchType: FARGATE
+      LoadBalancers:
+        - ContainerName: mongo
+          ContainerPort: 27017
+          TargetGroupArn:
+            Ref: MongoTCP27017TargetGroup
+      NetworkConfiguration:
+        AwsvpcConfiguration:
+          AssignPublicIp: ENABLED
+          SecurityGroups:
+            - Ref: SpringcloudnetworkNetwork
+          Subnets:
+            - subnet-08318553376bbbe2d
+            - subnet-0921600234d556f9d
+            - subnet-021f5d12ab260ff7c
+            - subnet-07790604e627001ae
+            - subnet-0e4a5a070d19aa7f2
+            - subnet-072918ef81782d0a6
+      PlatformVersion: 1.4.0
+      PropagateTags: SERVICE
+      SchedulingStrategy: REPLICA
+      ServiceRegistries:
+        - RegistryArn:
+            Fn::GetAtt:
+              - MongoServiceDiscoveryEntry
+              - Arn
+      Tags:
+        - Key: com.docker.compose.project
+          Value: skilltracker-backend
+        - Key: com.docker.compose.service
+          Value: mongo
+      TaskDefinition:
+        Ref: MongoTaskDefinition
+    Type: AWS::ECS::Service
+  MongoServiceDiscoveryEntry:
+    Properties:
+      Description: '"mongo" service discovery entry in Cloud Map'
+      DnsConfig:
+        DnsRecords:
+          - TTL: 60
+            Type: A
+        RoutingPolicy: MULTIVALUE
+      HealthCheckCustomConfig:
+        FailureThreshold: 1
+      Name: mongo
+      NamespaceId:
+        Ref: CloudMap
+    Type: AWS::ServiceDiscovery::Service
+  MongoTCP27017Listener:
+    Properties:
+      DefaultActions:
+        - ForwardConfig:
+            TargetGroups:
+              - TargetGroupArn:
+                  Ref: MongoTCP27017TargetGroup
+          Type: forward
+      LoadBalancerArn:
+        Ref: LoadBalancer
+      Port: 27017
+      Protocol: TCP
+    Type: AWS::ElasticLoadBalancingV2::Listener
+  MongoTCP27017TargetGroup:
+    Properties:
+      Port: 27017
+      Protocol: TCP
+      Tags:
+        - Key: com.docker.compose.project
+          Value: skilltracker-backend
+      TargetType: ip
+      VpcId: vpc-0de56540248f68bef
+    Type: AWS::ElasticLoadBalancingV2::TargetGroup
+  MongoTaskDefinition:
+    Properties:
+      ContainerDefinitions:
+        - Command:
+            - us-east-1.compute.internal
+            - skilltracker-backend.local
+          Essential: false
+          Image: docker/ecs-searchdomain-sidecar:1.0
+          LogConfiguration:
+            LogDriver: awslogs
+            Options:
+              awslogs-group:
+                Ref: LogGroup
+              awslogs-region:
+                Ref: AWS::Region
+              awslogs-stream-prefix: skilltracker-backend
+          Name: Mongo_ResolvConf_InitContainer
+        - DependsOn:
+            - Condition: SUCCESS
+              ContainerName: Mongo_ResolvConf_InitContainer
+          Environment:
+            - Name: MONGO_INITDB_DATABASE
+              Value: skill_tracker_db
+          Essential: true
+          Image: docker.io/library/mongo:latest@sha256:d341a86584b96eb665345a8f5b35fba8695ee1d0618fd012ec4696223a3d6c62
+          LinuxParameters: {}
+          LogConfiguration:
+            LogDriver: awslogs
+            Options:
+              awslogs-group:
+                Ref: LogGroup
+              awslogs-region:
+                Ref: AWS::Region
+              awslogs-stream-prefix: skilltracker-backend
+          Name: mongo
+          PortMappings:
+            - ContainerPort: 27017
+              HostPort: 27017
+              Protocol: tcp
+      Cpu: "256"
+      ExecutionRoleArn:
+        Ref: MongoTaskExecutionRole
+      Family: skilltracker-backend-mongo
+      Memory: "512"
+      NetworkMode: awsvpc
+      RequiresCompatibilities:
+        - FARGATE
+    Type: AWS::ECS::TaskDefinition
+  MongoTaskExecutionRole:
+    Properties:
+      AssumeRolePolicyDocument:
+        Statement:
+          - Action:
+              - sts:AssumeRole
+            Condition: {}
+            Effect: Allow
+            Principal:
+              Service: ecs-tasks.amazonaws.com
+        Version: 2012-10-17
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/service-role/AmazonECSTaskExecutionRolePolicy
+        - arn:aws:iam::aws:policy/AmazonEC2ContainerRegistryReadOnly
+      Tags:
+        - Key: com.docker.compose.project
+          Value: skilltracker-backend
+        - Key: com.docker.compose.service
+          Value: mongo
+    Type: AWS::IAM::Role
+  PostgresService:
+    DependsOn:
+      - PostgresTCP5432Listener
+    Properties:
+      Cluster:
+        Fn::GetAtt:
+          - Cluster
+          - Arn
+      DeploymentConfiguration:
+        MaximumPercent: 200
+        MinimumHealthyPercent: 100
+      DeploymentController:
+        Type: ECS
+      DesiredCount: 1
+      LaunchType: FARGATE
+      LoadBalancers:
+        - ContainerName: postgres
+          ContainerPort: 5432
+          TargetGroupArn:
+            Ref: PostgresTCP5432TargetGroup
+      NetworkConfiguration:
+        AwsvpcConfiguration:
+          AssignPublicIp: ENABLED
+          SecurityGroups:
+            - Ref: SpringcloudnetworkNetwork
+          Subnets:
+            - subnet-08318553376bbbe2d
+            - subnet-0921600234d556f9d
+            - subnet-021f5d12ab260ff7c
+            - subnet-07790604e627001ae
+            - subnet-0e4a5a070d19aa7f2
+            - subnet-072918ef81782d0a6
+      PlatformVersion: 1.4.0
+      PropagateTags: SERVICE
+      SchedulingStrategy: REPLICA
+      ServiceRegistries:
+        - RegistryArn:
+            Fn::GetAtt:
+              - PostgresServiceDiscoveryEntry
+              - Arn
+      Tags:
+        - Key: com.docker.compose.project
+          Value: skilltracker-backend
+        - Key: com.docker.compose.service
+          Value: postgres
+      TaskDefinition:
+        Ref: PostgresTaskDefinition
+    Type: AWS::ECS::Service
+  PostgresServiceDiscoveryEntry:
+    Properties:
+      Description: '"postgres" service discovery entry in Cloud Map'
+      DnsConfig:
+        DnsRecords:
+          - TTL: 60
+            Type: A
+        RoutingPolicy: MULTIVALUE
+      HealthCheckCustomConfig:
+        FailureThreshold: 1
+      Name: postgres
+      NamespaceId:
+        Ref: CloudMap
+    Type: AWS::ServiceDiscovery::Service
+  PostgresTCP5432Listener:
+    Properties:
+      DefaultActions:
+        - ForwardConfig:
+            TargetGroups:
+              - TargetGroupArn:
+                  Ref: PostgresTCP5432TargetGroup
+          Type: forward
+      LoadBalancerArn:
+        Ref: LoadBalancer
+      Port: 5432
+      Protocol: TCP
+    Type: AWS::ElasticLoadBalancingV2::Listener
+  PostgresTCP5432TargetGroup:
+    Properties:
+      Port: 5432
+      Protocol: TCP
+      Tags:
+        - Key: com.docker.compose.project
+          Value: skilltracker-backend
+      TargetType: ip
+      VpcId: vpc-0de56540248f68bef
+    Type: AWS::ElasticLoadBalancingV2::TargetGroup
+  PostgresTaskDefinition:
+    Properties:
+      ContainerDefinitions:
+        - Command:
+            - us-east-1.compute.internal
+            - skilltracker-backend.local
+          Essential: false
+          Image: docker/ecs-searchdomain-sidecar:1.0
+          LogConfiguration:
+            LogDriver: awslogs
+            Options:
+              awslogs-group:
+                Ref: LogGroup
+              awslogs-region:
+                Ref: AWS::Region
+              awslogs-stream-prefix: skilltracker-backend
+          Name: Postgres_ResolvConf_InitContainer
+        - DependsOn:
+            - Condition: SUCCESS
+              ContainerName: Postgres_ResolvConf_InitContainer
+          Environment:
+            - Name: POSTGRES_DB
+              Value: skill_tracker_db
+            - Name: POSTGRES_PASSWORD
+              Value: postgres
+            - Name: POSTGRES_USER
+              Value: postgres
+          Essential: true
+          Image: docker.io/library/postgres:14.8-alpine@sha256:fa48198f8c88d5563e7ff3f6d5d269be58a7571e4464d70e4cb6c0987d903ba3
+          LinuxParameters: {}
+          LogConfiguration:
+            LogDriver: awslogs
+            Options:
+              awslogs-group:
+                Ref: LogGroup
+              awslogs-region:
+                Ref: AWS::Region
+              awslogs-stream-prefix: skilltracker-backend
+          Name: postgres
+          PortMappings:
+            - ContainerPort: 5432
+              HostPort: 5432
+              Protocol: tcp
+      Cpu: "256"
+      ExecutionRoleArn:
+        Ref: PostgresTaskExecutionRole
+      Family: skilltracker-backend-postgres
+      Memory: "512"
+      NetworkMode: awsvpc
+      RequiresCompatibilities:
+        - FARGATE
+    Type: AWS::ECS::TaskDefinition
+  PostgresTaskExecutionRole:
+    Properties:
+      AssumeRolePolicyDocument:
+        Statement:
+          - Action:
+              - sts:AssumeRole
+            Condition: {}
+            Effect: Allow
+            Principal:
+              Service: ecs-tasks.amazonaws.com
+        Version: 2012-10-17
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/service-role/AmazonECSTaskExecutionRolePolicy
+        - arn:aws:iam::aws:policy/AmazonEC2ContainerRegistryReadOnly
+      Tags:
+        - Key: com.docker.compose.project
+          Value: skilltracker-backend
+        - Key: com.docker.compose.service
+          Value: postgres
+    Type: AWS::IAM::Role
+  Springcloudnetwork2181Ingress:
+    Properties:
+      CidrIp: 0.0.0.0/0
+      Description: zookeeper:2181/tcp on spring-cloud-network network
+      FromPort: 2181
+      GroupId:
+        Ref: SpringcloudnetworkNetwork
+      IpProtocol: TCP
+      ToPort: 2181
+    Type: AWS::EC2::SecurityGroupIngress
+  Springcloudnetwork5432Ingress:
+    Properties:
+      CidrIp: 0.0.0.0/0
+      Description: postgres:5432/tcp on spring-cloud-network network
+      FromPort: 5432
+      GroupId:
+        Ref: SpringcloudnetworkNetwork
+      IpProtocol: TCP
+      ToPort: 5432
+    Type: AWS::EC2::SecurityGroupIngress
+  Springcloudnetwork8080Ingress:
+    Properties:
+      CidrIp: 0.0.0.0/0
+      Description: auth-service:8080/tcp on spring-cloud-network network
+      FromPort: 8080
+      GroupId:
+        Ref: SpringcloudnetworkNetwork
+      IpProtocol: TCP
+      ToPort: 8080
+    Type: AWS::EC2::SecurityGroupIngress
+  Springcloudnetwork8081Ingress:
+    Properties:
+      CidrIp: 0.0.0.0/0
+      Description: engineer-service:8081/tcp on spring-cloud-network network
+      FromPort: 8081
+      GroupId:
+        Ref: SpringcloudnetworkNetwork
+      IpProtocol: TCP
+      ToPort: 8081
+    Type: AWS::EC2::SecurityGroupIngress
+  Springcloudnetwork8082Ingress:
+    Properties:
+      CidrIp: 0.0.0.0/0
+      Description: admin-service:8082/tcp on spring-cloud-network network
+      FromPort: 8082
+      GroupId:
+        Ref: SpringcloudnetworkNetwork
+      IpProtocol: TCP
+      ToPort: 8082
+    Type: AWS::EC2::SecurityGroupIngress
+  Springcloudnetwork9080Ingress:
+    Properties:
+      CidrIp: 0.0.0.0/0
+      Description: api-gateway:9080/tcp on spring-cloud-network network
+      FromPort: 9080
+      GroupId:
+        Ref: SpringcloudnetworkNetwork
+      IpProtocol: TCP
+      ToPort: 9080
+    Type: AWS::EC2::SecurityGroupIngress
+  Springcloudnetwork9092Ingress:
+    Properties:
+      CidrIp: 0.0.0.0/0
+      Description: kafka:9092/tcp on spring-cloud-network network
+      FromPort: 9092
+      GroupId:
+        Ref: SpringcloudnetworkNetwork
+      IpProtocol: TCP
+      ToPort: 9092
+    Type: AWS::EC2::SecurityGroupIngress
+  Springcloudnetwork27017Ingress:
+    Properties:
+      CidrIp: 0.0.0.0/0
+      Description: mongo:27017/tcp on spring-cloud-network network
+      FromPort: 27017
+      GroupId:
+        Ref: SpringcloudnetworkNetwork
+      IpProtocol: TCP
+      ToPort: 27017
+    Type: AWS::EC2::SecurityGroupIngress
+  SpringcloudnetworkNetwork:
+    Properties:
+      GroupDescription: skilltracker-backend Security Group for spring-cloud-network
+        network
+      Tags:
+        - Key: com.docker.compose.project
+          Value: skilltracker-backend
+        - Key: com.docker.compose.network
+          Value: skilltracker-backend_spring-cloud-network
+      VpcId: vpc-0de56540248f68bef
+    Type: AWS::EC2::SecurityGroup
+  SpringcloudnetworkNetworkIngress:
+    Properties:
+      Description: Allow communication within network spring-cloud-network
+      GroupId:
+        Ref: SpringcloudnetworkNetwork
+      IpProtocol: "-1"
+      SourceSecurityGroupId:
+        Ref: SpringcloudnetworkNetwork
+    Type: AWS::EC2::SecurityGroupIngress
+  ZookeeperService:
+    DependsOn:
+      - ZookeeperTCP2181Listener
+    Properties:
+      Cluster:
+        Fn::GetAtt:
+          - Cluster
+          - Arn
+      DeploymentConfiguration:
+        MaximumPercent: 200
+        MinimumHealthyPercent: 100
+      DeploymentController:
+        Type: ECS
+      DesiredCount: 1
+      LaunchType: FARGATE
+      LoadBalancers:
+        - ContainerName: zookeeper
+          ContainerPort: 2181
+          TargetGroupArn:
+            Ref: ZookeeperTCP2181TargetGroup
+      NetworkConfiguration:
+        AwsvpcConfiguration:
+          AssignPublicIp: ENABLED
+          SecurityGroups:
+            - Ref: SpringcloudnetworkNetwork
+          Subnets:
+            - subnet-08318553376bbbe2d
+            - subnet-0921600234d556f9d
+            - subnet-021f5d12ab260ff7c
+            - subnet-07790604e627001ae
+            - subnet-0e4a5a070d19aa7f2
+            - subnet-072918ef81782d0a6
+      PlatformVersion: 1.4.0
+      PropagateTags: SERVICE
+      SchedulingStrategy: REPLICA
+      ServiceRegistries:
+        - RegistryArn:
+            Fn::GetAtt:
+              - ZookeeperServiceDiscoveryEntry
+              - Arn
+      Tags:
+        - Key: com.docker.compose.project
+          Value: skilltracker-backend
+        - Key: com.docker.compose.service
+          Value: zookeeper
+      TaskDefinition:
+        Ref: ZookeeperTaskDefinition
+    Type: AWS::ECS::Service
+  ZookeeperServiceDiscoveryEntry:
+    Properties:
+      Description: '"zookeeper" service discovery entry in Cloud Map'
+      DnsConfig:
+        DnsRecords:
+          - TTL: 60
+            Type: A
+        RoutingPolicy: MULTIVALUE
+      HealthCheckCustomConfig:
+        FailureThreshold: 1
+      Name: zookeeper
+      NamespaceId:
+        Ref: CloudMap
+    Type: AWS::ServiceDiscovery::Service
+  ZookeeperTCP2181Listener:
+    Properties:
+      DefaultActions:
+        - ForwardConfig:
+            TargetGroups:
+              - TargetGroupArn:
+                  Ref: ZookeeperTCP2181TargetGroup
+          Type: forward
+      LoadBalancerArn:
+        Ref: LoadBalancer
+      Port: 2181
+      Protocol: TCP
+    Type: AWS::ElasticLoadBalancingV2::Listener
+  ZookeeperTCP2181TargetGroup:
+    Properties:
+      Port: 2181
+      Protocol: TCP
+      Tags:
+        - Key: com.docker.compose.project
+          Value: skilltracker-backend
+      TargetType: ip
+      VpcId: vpc-0de56540248f68bef
+    Type: AWS::ElasticLoadBalancingV2::TargetGroup
+  ZookeeperTaskDefinition:
+    Properties:
+      ContainerDefinitions:
+        - Command:
+            - us-east-1.compute.internal
+            - skilltracker-backend.local
+          Essential: false
+          Image: docker/ecs-searchdomain-sidecar:1.0
+          LogConfiguration:
+            LogDriver: awslogs
+            Options:
+              awslogs-group:
+                Ref: LogGroup
+              awslogs-region:
+                Ref: AWS::Region
+              awslogs-stream-prefix: skilltracker-backend
+          Name: Zookeeper_ResolvConf_InitContainer
+        - DependsOn:
+            - Condition: SUCCESS
+              ContainerName: Zookeeper_ResolvConf_InitContainer
+          Environment:
+            - Name: ZOOKEEPER_CLIENT_PORT
+              Value: "2181"
+            - Name: ZOOKEEPER_SERVER_ID
+              Value: "1"
+          Essential: true
+          Image: docker.io/confluentinc/cp-zookeeper:latest@sha256:0bec03c1f3ce77eff90e58d35cf4aae0fc7776afb26c8e020bb521668291fddb
+          LinuxParameters: {}
+          LogConfiguration:
+            LogDriver: awslogs
+            Options:
+              awslogs-group:
+                Ref: LogGroup
+              awslogs-region:
+                Ref: AWS::Region
+              awslogs-stream-prefix: skilltracker-backend
+          Name: zookeeper
+          PortMappings:
+            - ContainerPort: 2181
+              HostPort: 2181
+              Protocol: tcp
+      Cpu: "256"
+      ExecutionRoleArn:
+        Ref: ZookeeperTaskExecutionRole
+      Family: skilltracker-backend-zookeeper
+      Memory: "512"
+      NetworkMode: awsvpc
+      RequiresCompatibilities:
+        - FARGATE
+    Type: AWS::ECS::TaskDefinition
+  ZookeeperTaskExecutionRole:
+    Properties:
+      AssumeRolePolicyDocument:
+        Statement:
+          - Action:
+              - sts:AssumeRole
+            Condition: {}
+            Effect: Allow
+            Principal:
+              Service: ecs-tasks.amazonaws.com
+        Version: 2012-10-17
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/service-role/AmazonECSTaskExecutionRolePolicy
+        - arn:aws:iam::aws:policy/AmazonEC2ContainerRegistryReadOnly
+      Tags:
+        - Key: com.docker.compose.project
+          Value: skilltracker-backend
+        - Key: com.docker.compose.service
+          Value: zookeeper
+    Type: AWS::IAM::Role
